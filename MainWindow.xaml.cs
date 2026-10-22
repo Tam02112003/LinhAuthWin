@@ -561,99 +561,132 @@ namespace AuthWin
                 IBarcodeReader reader = new BarcodeReader();
                 var barcodeBitmap = (System.Drawing.Bitmap)System.Drawing.Image.FromFile(ofd.FileName);
                 var result = reader.Decode(barcodeBitmap);
-                if (result != null)
+                ProcessBarcodeResult(result);
+            }
+        }
+
+        private void btnPasteQR_Click(object sender, RoutedEventArgs e)
+        {
+            if (!Clipboard.ContainsImage())
+            {
+                MessageBox.Show("No image found in clipboard!", "AuthWin", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            BitmapSource bitmapSource = Clipboard.GetImage();
+            using (System.Drawing.Bitmap barcodeBitmap = BitmapSourceToBitmap(bitmapSource))
+            {
+                IBarcodeReader reader = new BarcodeReader();
+                var result = reader.Decode(barcodeBitmap);
+                ProcessBarcodeResult(result);
+            }
+        }
+
+        private System.Drawing.Bitmap BitmapSourceToBitmap(BitmapSource source)
+        {
+            using (var ms = new MemoryStream())
+            {
+                var encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(source));
+                encoder.Save(ms);
+                ms.Position = 0;
+                return new System.Drawing.Bitmap(ms);
+            }
+        }
+
+        private void ProcessBarcodeResult(ZXing.Result result)
+        {
+            if (result != null)
+            {
+                string Uri = result.Text;
+                if (Uri.StartsWith("otpauth://totp/"))
                 {
-                    string Uri = result.Text;
-                    if (Uri.StartsWith("otpauth://totp/"))
+                    Account acc = new Account();
+
+                    Uri = Uri.Replace("otpauth://totp/", "");
+                    string ni = Uri.Substring(0, Uri.IndexOf("?"));
+                    ni = System.Web.HttpUtility.UrlDecode(ni);
+                    acc.Issuer = ni.Split(':')[0];
+                    acc.Name = ni.Split(':')[1];
+
+                    string qs = Uri.Substring(Uri.IndexOf("?") + 1);
+                    string[] qsparams = qs.Split('&');
+                    foreach (string qsparam in qsparams)
                     {
-                        Account acc = new Account();
-
-                        Uri = Uri.Replace("otpauth://totp/", "");
-                        string ni = Uri.Substring(0, Uri.IndexOf("?"));
-                        ni = System.Web.HttpUtility.UrlDecode(ni);
-                        acc.Issuer = ni.Split(':')[0];
-                        acc.Name = ni.Split(':')[1];
-
-                        string qs = Uri.Substring(Uri.IndexOf("?") + 1);
-                        string[] qsparams = qs.Split('&');
-                        foreach (string qsparam in qsparams)
+                        string[] parts = qsparam.Split('=');
+                        switch (parts[0].ToLower())
                         {
-                            string[] parts = qsparam.Split('=');
-                            switch (parts[0].ToLower())
-                            {
-                                case "secret":
-                                    acc.Secret = parts[1];
-                                    break;
-                                case "digits":
-                                    acc.Length = Convert.ToInt32(parts[1]);
-                                    break;
-                                case "period":
-                                    acc.Duration = Convert.ToInt32(parts[1]);
-                                    break;
-                                case "algorithm":
-                                    acc.HashAlgo = (Account.Hash)Enum.Parse(typeof(Account.Hash), parts[1], true);
-                                    break;
-                            }
+                            case "secret":
+                                acc.Secret = parts[1];
+                                break;
+                            case "digits":
+                                acc.Length = Convert.ToInt32(parts[1]);
+                                break;
+                            case "period":
+                                acc.Duration = Convert.ToInt32(parts[1]);
+                                break;
+                            case "algorithm":
+                                acc.HashAlgo = (Account.Hash)Enum.Parse(typeof(Account.Hash), parts[1], true);
+                                break;
                         }
+                    }
 
-                        acc.Id = accounts.Count;
-                        GenerateCode(acc);
-                        accounts.Add(acc);
-                        ApplySort();
-                        WriteJson();
+                    acc.Id = accounts.Count;
+                    GenerateCode(acc);
+                    accounts.Add(acc);
+                    ApplySort();
+                    WriteJson();
 
+                    lbCodes.Visibility = Visibility.Visible;
+                    pnlBottom.Visibility = Visibility.Visible;
+                    grdAdd.Visibility = Visibility.Collapsed;
+                    grdManual.Visibility = Visibility.Collapsed;
+                }
+                else if (Uri.StartsWith("otpauth-migration:")) {
+                    try
+                    {
+                        Uri = Uri.Replace("otpauth-migration://offline?data=", "");
+                        Uri = HttpUtility.UrlDecode(Uri);
+                        byte[] bytes = System.Convert.FromBase64String(Uri);
+                        MigrationPayload payload = new MigrationPayload();
+                        payload = MigrationPayload.Parser.ParseFrom(bytes);
+
+                        if (payload.OtpParameters.Count > 0) {
+                            for (int i = 0; i < payload.OtpParameters.Count; i++)
+                            {
+                                Account acc = new Account();
+                                acc.Name = payload.OtpParameters[i].Name;
+                                acc.Issuer = payload.OtpParameters[i].Issuer;
+                                acc.Secret = Base32.ToBase32String(payload.OtpParameters[i].Secret.ToByteArray());
+                                if (payload.OtpParameters[i].Digits == 2) acc.Length = 8;
+
+                                acc.Id = accounts.Count;
+                                GenerateCode(acc);
+                                accounts.Add(acc);
+                            }
+                            ApplySort();
+                            WriteJson();
+                        }
+                    }
+                    catch {
+                        MessageBox.Show("Error reading Google Authenticator code", "AuthWin", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    }
+                    finally {
                         lbCodes.Visibility = Visibility.Visible;
                         pnlBottom.Visibility = Visibility.Visible;
                         grdAdd.Visibility = Visibility.Collapsed;
                         grdManual.Visibility = Visibility.Collapsed;
                     }
-                    else if (Uri.StartsWith("otpauth-migration:")) {
-                        try
-                        {
-                            Uri = Uri.Replace("otpauth-migration://offline?data=", "");
-                            Uri = HttpUtility.UrlDecode(Uri);
-                            byte[] bytes = System.Convert.FromBase64String(Uri);
-                            MigrationPayload payload = new MigrationPayload();
-                            payload = MigrationPayload.Parser.ParseFrom(bytes);
-
-                            if (payload.OtpParameters.Count > 0) {
-                                for (int i = 0; i < payload.OtpParameters.Count; i++)
-                                {
-                                    Account acc = new Account();
-                                    acc.Name = payload.OtpParameters[i].Name;
-                                    acc.Issuer = payload.OtpParameters[i].Issuer;
-                                    acc.Secret = Base32.ToBase32String(payload.OtpParameters[i].Secret.ToByteArray());
-                                    if (payload.OtpParameters[i].Digits == 2) acc.Length = 8;
-
-                                    acc.Id = accounts.Count;
-                                    GenerateCode(acc);
-                                    accounts.Add(acc);
-                                }
-                                ApplySort();
-                                WriteJson();
-                            }
-                        }
-                        catch {
-                            MessageBox.Show("Error reading Google Authenticator code", "AuthWin", MessageBoxButton.OK, MessageBoxImage.Exclamation);
-                        }
-                        finally {
-                            lbCodes.Visibility = Visibility.Visible;
-                            pnlBottom.Visibility = Visibility.Visible;
-                            grdAdd.Visibility = Visibility.Collapsed;
-                            grdManual.Visibility = Visibility.Collapsed;
-                        }
-                    }
-                    else
-                    {
-                        MessageBox.Show("Not a valid QR code", "AuthWin", MessageBoxButton.OK, MessageBoxImage.Exclamation);
-                    }
                 }
                 else
                 {
-                    MessageBox.Show("Cannot read the QR code!", "AuthWin", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show("Not a valid QR code", "AuthWin", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                 }
             }
-
+            else
+            {
+                MessageBox.Show("Cannot read the QR code!", "AuthWin", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void btnExport_Click(object sender, RoutedEventArgs e)

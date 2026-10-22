@@ -104,9 +104,11 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition />
                     <ColumnDefinition />
+                    <ColumnDefinition />
                 </Grid.ColumnDefinitions>
                 <Button Grid.Column="0" Padding="4" Name="btnScanQR" Click="btnScanQR_Click">Scan _QR Code</Button>
-                <Button Grid.Column="1"  Padding="4" Margin="10,0,0,0" Name="btnAddManual" Click="btnAddManual_Click">Add Secret _Manually</Button>
+                <Button Grid.Column="1" Padding="4" Margin="10,0,0,0" Name="btnPasteQR" Click="btnPasteQR_Click">_Paste QR from Clipboard</Button>
+                <Button Grid.Column="2"  Padding="4" Margin="10,0,0,0" Name="btnAddManual" Click="btnAddManual_Click">Add Secret _Manually</Button>
             </Grid>
             
             <Grid Name="grdManual" Grid.Row="1" Visibility="Collapsed">
