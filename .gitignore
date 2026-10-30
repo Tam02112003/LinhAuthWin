@@ -1,1 +1,26 @@
 .vs
+
+# Stray reference-assembly/runtime files copied locally during legacy MSBuild + Roslyn builds
+bin/*/PresentationCore.dll
+bin/*/PresentationCore.xml
+bin/*/System.Data.OracleClient.dll
+bin/*/System.Data.OracleClient.xml
+bin/*/System.Data.dll
+bin/*/System.Data.xml
+bin/*/System.EnterpriseServices.Wrapper.dll
+bin/*/System.EnterpriseServices.dll
+bin/*/System.EnterpriseServices.xml
+bin/*/System.Net.Http.dll
+bin/*/System.Net.Http.xml
+bin/*/System.Printing.dll
+bin/*/System.Printing.xml
+bin/*/System.Transactions.dll
+bin/*/System.Transactions.xml
+bin/*/System.Web.dll
+bin/*/System.Web.xml
+bin/*/mscorlib.dll
+bin/*/normidna.nlp
+bin/*/normnfc.nlp
+bin/*/normnfd.nlp
+bin/*/normnfkc.nlp
+bin/*/normnfkd.nlp
