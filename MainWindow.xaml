@@ -6,12 +6,41 @@
         xmlns:local="clr-namespace:AuthWin"
         mc:Ignorable="d"
         Title="AuthWin" Height="500" Width="500" ResizeMode="CanResizeWithGrip" WindowStartupLocation="CenterScreen" Loaded="Window_Loaded" Icon="/AuthWin.ico">
+    <Window.Resources>
+        <local:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <local:TagActiveBrushConverter x:Key="TagActiveBrushConverter" />
+        <local:TagActiveForegroundConverter x:Key="TagActiveForegroundConverter" />
+    </Window.Resources>
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"></RowDefinition>
             <RowDefinition Height="Auto"></RowDefinition>
         </Grid.RowDefinitions>
-        <ListBox Grid.Row="0" Name="lbCodes" Visibility="Visible" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" VirtualizingPanel.ScrollUnit="Pixel" SelectionChanged="lbCodes_SelectionChanged">
+        <Grid Grid.Row="0" Name="grdList" Visibility="Visible">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"></RowDefinition>
+                <RowDefinition Height="*"></RowDefinition>
+            </Grid.RowDefinitions>
+
+            <ItemsControl Grid.Row="0" Name="icTags" Margin="0,0,0,8">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border CornerRadius="10" Margin="0,0,6,6" Padding="8,3" Cursor="Hand"
+                                Background="{Binding IsActive, Converter={StaticResource TagActiveBrushConverter}}"
+                                MouseLeftButtonUp="TagChip_MouseLeftButtonUp" Tag="{Binding Name}">
+                            <TextBlock Text="{Binding Label}" FontSize="12"
+                                       Foreground="{Binding IsActive, Converter={StaticResource TagActiveForegroundConverter}}" />
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <ListBox Grid.Row="1" Name="lbCodes" Visibility="Visible" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" VirtualizingPanel.ScrollUnit="Pixel" SelectionChanged="lbCodes_SelectionChanged">
 
             <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem">
@@ -41,6 +70,10 @@
                             <StackPanel Orientation="Horizontal" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3">
                                 <Label Padding="0" Content="{Binding Name}" FontSize="16"></Label>
                                 <Label Padding="0" Content="{Binding Issuer}" FontSize="16" Margin="5,0,0,0"></Label>
+                                <Border CornerRadius="8" Background="#EEE" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center"
+                                        Visibility="{Binding HasTag, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBlock Text="{Binding Tag}" FontSize="11" Foreground="#555" />
+                                </Border>
                             </StackPanel>
                             
                             <Label Grid.Row="1" Grid.Column="0" Content="{Binding Totp}" Padding="5" FontSize="24" FontWeight="Bold" Foreground="Blue" VerticalAlignment="Center"></Label>
@@ -59,8 +92,9 @@
                     </Border>
                 </DataTemplate>
             </ListBox.ItemTemplate>
-        </ListBox>
-        
+            </ListBox>
+        </Grid>
+
         <Grid Grid.Row="1" Margin="0,10,0,0" Name="pnlBottom">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="50*" />
@@ -120,6 +154,7 @@
                     <RowDefinition Height="Auto"></RowDefinition>
                     <RowDefinition Height="Auto"></RowDefinition>
                     <RowDefinition Height="Auto"></RowDefinition>
+                    <RowDefinition Height="Auto"></RowDefinition>
                     <RowDefinition Height="*"></RowDefinition>
                 </Grid.RowDefinitions>
                 <StackPanel Grid.Row="0" Grid.Column="0">
@@ -137,7 +172,11 @@
                         <TextBox x:Name="txtSecret" FontSize="16" Padding="2"></TextBox>
                     </DockPanel>
                 </StackPanel>
-                <StackPanel Grid.Row="2" Margin="0,10" Grid.ColumnSpan="2">
+                <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,10,0,0">
+                    <Label Padding="0">Tag (optional)</Label>
+                    <TextBox x:Name="txtTag" FontSize="16" Margin="0,2,0,0" Padding="2"></TextBox>
+                </StackPanel>
+                <StackPanel Grid.Row="3" Margin="0,10" Grid.ColumnSpan="2">
                     <Label Padding="0" Cursor="Hand" Name="lblAdvance" Focusable="True" MouseLeftButtonUp="lblAdvance_MouseLeftButtonUp">&#11208; A_dvance</Label>
                     <Grid x:Name="grdAdvance" Margin="0,10,0,0" Visibility="Collapsed">
                         <Grid.ColumnDefinitions>
@@ -163,8 +202,8 @@
                         </StackPanel>
                     </Grid>
                 </StackPanel>
-                <Button x:Name="btnAddAccountManual" Grid.Column="0" Grid.Row="3" Padding="4" Grid.ColumnSpan="2" Width="150" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,10,0,0" Click="btnAddAccountManual_Click">Add</Button>
-                <Button x:Name="btnEditAccount" Grid.Column="0" Grid.Row="3" Padding="4" Grid.ColumnSpan="2" Width="150" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,10,0,0" Click="btnEditAccount_Click" Visibility="Collapsed">Save</Button>
+                <Button x:Name="btnAddAccountManual" Grid.Column="0" Grid.Row="4" Padding="4" Grid.ColumnSpan="2" Width="150" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,10,0,0" Click="btnAddAccountManual_Click">Add</Button>
+                <Button x:Name="btnEditAccount" Grid.Column="0" Grid.Row="4" Padding="4" Grid.ColumnSpan="2" Width="150" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,10,0,0" Click="btnEditAccount_Click" Visibility="Collapsed">Save</Button>
             </Grid>
             <Button Grid.Row="2" Padding="4" x:Name="btnBack" Click="btnBack_Click">_Back</Button>
         </Grid>

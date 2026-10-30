@@ -4,16 +4,16 @@
 winexe
 C#
 .cs
-G:\Microsoft VS Code SPACE\AuthWin\AuthWin\obj\Debug\
+D:\setup\AuthWin\obj\Debug\
 AuthWin
 none
 false
 DEBUG;TRACE
-G:\Microsoft VS Code SPACE\AuthWin\AuthWin\App.xaml
-3-813452275
+D:\setup\AuthWin\App.xaml
+3-561470711
 
-11-1531320322
-30852114621
+12-925978865
+301452677909
 MainWindow.xaml;VaultPasswordWindow.xaml;VaultWorkWindow.xaml;
 
 False

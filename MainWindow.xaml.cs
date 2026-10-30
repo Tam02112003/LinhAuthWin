@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -50,12 +51,61 @@ namespace AuthWin
         string PrefsFile = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\AuthWin\\prefs.json";
         AccountSortMode sortMode = AccountSortMode.Added;
         bool sortUiReady = false;
+        string activeTagFilter = null;
 
         public MainWindow()
         {
             InitializeComponent();
             secretCopiedTimer.Interval = TimeSpan.FromSeconds(2);
             secretCopiedTimer.Tick += secretCopiedTimer_Tick;
+        }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool BringWindowToTop(IntPtr hWnd);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+        private static extern uint GetCurrentThreadId();
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+        private const int SW_RESTORE = 9;
+
+        public void BringToFront()
+        {
+            if (WindowState == WindowState.Minimized)
+                WindowState = WindowState.Normal;
+            Show();
+
+            IntPtr hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            IntPtr foreground = GetForegroundWindow();
+            uint foregroundThreadId = GetWindowThreadProcessId(foreground, out _);
+            uint thisThreadId = GetCurrentThreadId();
+
+            // SetForegroundWindow is ignored for background processes unless the
+            // calling thread's input is attached to the current foreground thread.
+            bool attached = foregroundThreadId != thisThreadId &&
+                AttachThreadInput(thisThreadId, foregroundThreadId, true);
+
+            ShowWindow(hwnd, SW_RESTORE);
+            BringWindowToTop(hwnd);
+            SetForegroundWindow(hwnd);
+            Activate();
+
+            if (attached)
+                AttachThreadInput(thisThreadId, foregroundThreadId, false);
         }
 
         protected override void OnClosed(EventArgs e)
@@ -104,7 +154,7 @@ namespace AuthWin
 
         private void btnAdd_Click(object sender, RoutedEventArgs e)
         {
-            lbCodes.Visibility = Visibility.Collapsed;
+            grdList.Visibility = Visibility.Collapsed;
             pnlBottom.Visibility = Visibility.Collapsed;
             grdAdd.Visibility = Visibility.Visible;
             grdAddButtons.Visibility = Visibility.Visible;
@@ -124,7 +174,7 @@ namespace AuthWin
 
         private void btnBack_Click(object sender, RoutedEventArgs e)
         {
-            lbCodes.Visibility = Visibility.Visible;
+            grdList.Visibility = Visibility.Visible;
             pnlBottom.Visibility = Visibility.Visible;
             grdAdd.Visibility = Visibility.Collapsed;
             grdManual.Visibility = Visibility.Collapsed;
@@ -138,6 +188,7 @@ namespace AuthWin
                 txtName.Text = string.Empty;
                 txtIssuer.Text = string.Empty;
                 txtSecret.Text = string.Empty;
+                txtTag.Text = string.Empty;
                 txtDuration.Text = "30";
                 txtLength.Text = "6";
                 cmbAlgo.SelectedIndex = 0;
@@ -189,6 +240,7 @@ namespace AuthWin
                 txtIssuer.Background = null;
             }*/
             account.Issuer = txtIssuer.Text.Trim();
+            account.Tag = txtTag.Text.Trim();
 
             if (string.IsNullOrEmpty(txtSecret.Text))
             {
@@ -233,10 +285,11 @@ namespace AuthWin
                 txtName.Text = "";
                 txtIssuer.Text = "";
                 txtSecret.Text = "";
+                txtTag.Text = "";
                 txtDuration.Text = "30";
                 cmbAlgo.SelectedIndex = 0;
                 txtLength.Text = "6";
-                lbCodes.Visibility = Visibility.Visible;
+                grdList.Visibility = Visibility.Visible;
                 pnlBottom.Visibility = Visibility.Visible;
                 grdAdd.Visibility = Visibility.Collapsed;
                 grdManual.Visibility = Visibility.Collapsed;
@@ -440,7 +493,7 @@ namespace AuthWin
                 imgQR.Source = bi;
             }
 
-            lbCodes.Visibility = Visibility.Collapsed;
+            grdList.Visibility = Visibility.Collapsed;
             grdQR.Visibility = Visibility.Visible;
             lblCopy.Visibility = Visibility.Hidden;
             pnlBottom.Visibility = Visibility.Hidden;
@@ -453,7 +506,7 @@ namespace AuthWin
             int i = (int)((Image)sender).Tag;
             EditIndex = i;
 
-            lbCodes.Visibility = Visibility.Collapsed;
+            grdList.Visibility = Visibility.Collapsed;
             pnlBottom.Visibility = Visibility.Collapsed;
             grdAdd.Visibility = Visibility.Visible;
             grdAddButtons.Visibility = Visibility.Hidden;
@@ -462,6 +515,7 @@ namespace AuthWin
 
             txtName.Text = accounts[i].Name;
             txtIssuer.Text = accounts[i].Issuer;
+            txtTag.Text = accounts[i].Tag;
             txtSecret.Text = accounts[i].Secret;
             secretCopiedTimer.Stop();
             txtSecret.Background = null;
@@ -506,6 +560,7 @@ namespace AuthWin
             {
                 accounts[n].Id = n;
             }
+            RefreshTagChips();
             lbCodes.Items.Refresh();
             WriteJson();
             e.Handled = true;
@@ -524,7 +579,7 @@ namespace AuthWin
         private void btnCloseQR_Click(object sender, RoutedEventArgs e)
         {
             grdQR.Visibility = Visibility.Collapsed;
-            lbCodes.Visibility = Visibility.Visible;
+            grdList.Visibility = Visibility.Visible;
             lblCopy.Visibility = Visibility.Visible;
             pnlBottom.Visibility = Visibility.Visible;
             btnCopyUri.Content = "Copy";
@@ -637,7 +692,7 @@ namespace AuthWin
                     ApplySort();
                     WriteJson();
 
-                    lbCodes.Visibility = Visibility.Visible;
+                    grdList.Visibility = Visibility.Visible;
                     pnlBottom.Visibility = Visibility.Visible;
                     grdAdd.Visibility = Visibility.Collapsed;
                     grdManual.Visibility = Visibility.Collapsed;
@@ -672,7 +727,7 @@ namespace AuthWin
                         MessageBox.Show("Error reading Google Authenticator code", "AuthWin", MessageBoxButton.OK, MessageBoxImage.Exclamation);
                     }
                     finally {
-                        lbCodes.Visibility = Visibility.Visible;
+                        grdList.Visibility = Visibility.Visible;
                         pnlBottom.Visibility = Visibility.Visible;
                         grdAdd.Visibility = Visibility.Collapsed;
                         grdManual.Visibility = Visibility.Collapsed;
@@ -742,11 +797,12 @@ namespace AuthWin
                 }
 
                 accounts[EditIndex].Issuer = txtIssuer.Text.Trim();
+                accounts[EditIndex].Tag = txtTag.Text.Trim();
                 ApplySort();
                 lbCodes.Items.Refresh();
                 WriteJson();
 
-                lbCodes.Visibility = Visibility.Visible;
+                grdList.Visibility = Visibility.Visible;
                 pnlBottom.Visibility = Visibility.Visible;
                 grdAdd.Visibility = Visibility.Collapsed;
                 grdManual.Visibility = Visibility.Collapsed;
@@ -868,6 +924,50 @@ namespace AuthWin
             ListCollectionView view = CollectionViewSource.GetDefaultView(accounts) as ListCollectionView;
             if (view == null) return;
             view.CustomSort = sortMode == AccountSortMode.Added ? null : new AccountDisplayComparer(sortMode);
+            view.Filter = FilterByActiveTag;
+            RefreshTagChips();
+        }
+
+        private bool FilterByActiveTag(object item)
+        {
+            if (string.IsNullOrEmpty(activeTagFilter)) return true;
+            Account acc = item as Account;
+            return acc != null && string.Equals((acc.Tag ?? "").Trim(), activeTagFilter, StringComparison.CurrentCultureIgnoreCase);
+        }
+
+        private void RefreshTagChips()
+        {
+            List<string> distinctTags = accounts
+                .Select(a => (a.Tag ?? "").Trim())
+                .Where(t => !string.IsNullOrEmpty(t))
+                .GroupBy(t => t, StringComparer.CurrentCultureIgnoreCase)
+                .Select(g => g.First())
+                .OrderBy(t => t, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+
+            if (activeTagFilter != null && !distinctTags.Any(t => string.Equals(t, activeTagFilter, StringComparison.CurrentCultureIgnoreCase)))
+                activeTagFilter = null;
+
+            List<TagChip> chips = new List<TagChip> { new TagChip { Name = null, Label = "All", IsActive = activeTagFilter == null } };
+            chips.AddRange(distinctTags.Select(tag => new TagChip
+            {
+                Name = tag,
+                Label = tag,
+                IsActive = string.Equals(tag, activeTagFilter, StringComparison.CurrentCultureIgnoreCase)
+            }));
+
+            icTags.ItemsSource = chips;
+            icTags.Visibility = distinctTags.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void TagChip_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            string tag = ((FrameworkElement)sender).Tag as string;
+            activeTagFilter = tag != null && string.Equals(activeTagFilter, tag, StringComparison.CurrentCultureIgnoreCase) ? null : tag;
+
+            ListCollectionView view = CollectionViewSource.GetDefaultView(accounts) as ListCollectionView;
+            view?.Refresh();
+            RefreshTagChips();
         }
 
         private void LoadSortPreference()
@@ -980,6 +1080,10 @@ namespace AuthWin
         public int Duration { get; set; }
         public int Length { get; set; }
         public Hash HashAlgo { get; set; }
+        public string Tag { get; set; }
+
+        [JsonIgnore]
+        public bool HasTag => !string.IsNullOrWhiteSpace(Tag);
 
         private string _totp;
         [JsonIgnore]
@@ -1062,5 +1166,39 @@ namespace AuthWin
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
+
+    public class TagChip
+    {
+        public string Name { get; set; }
+        public string Label { get; set; }
+        public bool IsActive { get; set; }
+    }
+
+    public class BoolToVisibilityConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+            (value is bool b && b) ? Visibility.Visible : Visibility.Collapsed;
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+            throw new NotSupportedException();
+    }
+
+    public class TagActiveBrushConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+            (value is bool b && b) ? Brushes.DodgerBlue : new SolidColorBrush(Color.FromRgb(0xEE, 0xEE, 0xEE));
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+            throw new NotSupportedException();
+    }
+
+    public class TagActiveForegroundConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+            (value is bool b && b) ? Brushes.White : new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55));
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+            throw new NotSupportedException();
     }
 }
